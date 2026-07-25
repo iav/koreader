@@ -51,6 +51,39 @@ local function currentTime()
     return _("Time synchronized.")
 end
 
+-- Bound the NTP client's runtime ourselves.
+-- Both busybox's ntpd and ntpdate implement their timeouts with alarm()/SIGALRM, so neither can
+-- give up if SIGALRM happens to be blocked in our signal mask -- and a signal mask is inherited
+-- across fork() and preserved across execve(). That is not hypothetical: third-party Kindle
+-- hotkey launchers exist that run the launched program from inside their own SIGALRM handler,
+-- which leaves the signal blocked for KOReader and for everything KOReader spawns in turn. The
+-- client then waits forever, os.execute() never returns, and the UI is wedged until the user
+-- power-cycles the device. sleep (nanosleep) and SIGTERM are unaffected, so an external watchdog
+-- still works. Same reasoning as the ping CLI fall-back in Device:ping4.
+local NTP_TIMEOUT = 30 -- seconds; deliberately generous, a sync legitimately takes a few
+
+local function runNTPClient()
+    -- The watchdog counts in one-second steps instead of sleeping through the whole timeout, so
+    -- it stops on its own as soon as the client is gone. That keeps a late kill from landing on a
+    -- recycled pid, and bounds what we leak when cancelling it: $watchdog is the subshell, and
+    -- killing that does not reach a `sleep` child of it.
+    -- `wait` yields the client's own exit status; `exit` carries it past the watchdog cleanup.
+    return os.execute(string.format([[%s &
+                                      pid=$!
+                                      (i=%d
+                                       while [ $i -gt 0 ] && kill -0 $pid 2>/dev/null; do
+                                           sleep 1
+                                           i=$((i-1))
+                                       done
+                                       [ $i -eq 0 ] && kill $pid 2>/dev/null) &
+                                      watchdog=$!
+                                      wait $pid 2>/dev/null
+                                      rc=$?
+                                      kill $watchdog 2>/dev/null
+                                      exit $rc
+                                      ]], ntp_cmd, NTP_TIMEOUT))
+end
+
 local function syncNTP()
     local info = InfoMessage:new{
         text = _("Synchronizing time. This may take several seconds.")
@@ -58,7 +91,7 @@ local function syncNTP()
     UIManager:show(info)
     UIManager:forceRePaint()
     local txt
-    if os.execute(ntp_cmd) ~= 0 then
+    if runNTPClient() ~= 0 then
         txt = _("Failed to retrieve time from server. Please check your network configuration.")
     else
         txt = currentTime()
