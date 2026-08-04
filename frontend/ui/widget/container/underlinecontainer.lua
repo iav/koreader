@@ -74,8 +74,11 @@ function UnderlineContainer:_paintFocusBar(bb, line_x, bottom, line_width)
     local h = self:_focusBarHeight()
     if h == 0 then return end
     -- Clear its own strip first: a focus-only repaint has no parent to do that for us.
-    bb:paintRect(line_x, self:_focusBarTop(bottom), line_width, h,
-        self.focused and self.color or self.background)
+    -- Without a background we can only draw the bar, never erase it, so leave the
+    -- clearing to whoever repaints the widget.
+    local color = self.focused and self.color or self.background
+    if not color then return end
+    bb:paintRect(line_x, self:_focusBarTop(bottom), line_width, h, color)
 end
 
 --- Repaint just the focus bar, without touching the rest of the widget.
