@@ -298,13 +298,36 @@ function FocusManager:onFocusMove(args)
             current_item:handleEvent(Event:new("Unfocus"))
             next_item:handleEvent(Event:new("Focus"))
             -- Trigger a fast repaint, this does not count toward a flashing eink refresh.
-            -- Only the two items involved change, so repaint the box holding them both;
-            -- fall back to the parent when we don't know where one of them is.
+            local parent = self.show_parent or self
+            local bar_a, bar_b
+            if current_item.getFocusIndicatorRegion and next_item.getFocusIndicatorRegion then
+                bar_a = current_item:getFocusIndicatorRegion()
+                bar_b = next_item:getFocusIndicatorRegion()
+            end
             local region
-            if current_item.dimen and next_item.dimen then
+            if not (bar_a and bar_b) and current_item.dimen and next_item.dimen then
                 region = current_item.dimen:combine(next_item.dimen)
             end
-            UIManager:setDirty(self.show_parent or self, "fast", region)
+            if bar_a and bar_b and UIManager:getTopmostVisibleWidget() == parent then
+                -- Only the two focus bars changed: paint them, and refresh each on its own,
+                -- so nothing between the two rows is touched.
+                local bb = Device.screen.bb
+                if current_item.repaintFocusIndicator and next_item.repaintFocusIndicator
+                        and current_item:repaintFocusIndicator(bb) and next_item:repaintFocusIndicator(bb) then
+                    UIManager:setDirty(nil, "fast", bar_a)
+                    UIManager:setDirty(nil, "fast", bar_b)
+                else
+                    UIManager:setDirty(parent, "fast")
+                end
+            elseif region and UIManager:getTopmostVisibleWidget() == parent then
+                -- We know where both items are: repaint just them, and refresh the box
+                -- holding both, instead of the whole window.
+                UIManager:widgetRepaint(current_item, current_item.dimen.x, current_item.dimen.y)
+                UIManager:widgetRepaint(next_item, next_item.dimen.x, next_item.dimen.y)
+                UIManager:setDirty(nil, "fast", region)
+            else
+                UIManager:setDirty(parent, "fast", region)
+            end
             break
         end
     end
