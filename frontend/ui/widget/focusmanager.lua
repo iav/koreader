@@ -294,12 +294,17 @@ function FocusManager:onFocusMove(args)
         if self.layout[self.selected.y][self.selected.x] ~= current_item
         or not self.layout[self.selected.y][self.selected.x].is_inactive then
             -- we found a different object to focus
+            local next_item = self.layout[self.selected.y][self.selected.x]
             current_item:handleEvent(Event:new("Unfocus"))
-            self.layout[self.selected.y][self.selected.x]:handleEvent(Event:new("Focus"))
-            -- Trigger a fast repaint, this does not count toward a flashing eink refresh
-            -- NOTE: Ideally, we'd only have to repaint the specific subwidget we're highlighting,
-            --       but we may not know its exact coordinates, so, redraw the parent widget instead.
-            UIManager:setDirty(self.show_parent or self, "fast")
+            next_item:handleEvent(Event:new("Focus"))
+            -- Trigger a fast repaint, this does not count toward a flashing eink refresh.
+            -- Only the two items involved change, so repaint the box holding them both;
+            -- fall back to the parent when we don't know where one of them is.
+            local region
+            if current_item.dimen and next_item.dimen then
+                region = current_item.dimen:combine(next_item.dimen)
+            end
+            UIManager:setDirty(self.show_parent or self, "fast", region)
             break
         end
     end
