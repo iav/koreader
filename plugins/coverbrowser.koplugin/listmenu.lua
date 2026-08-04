@@ -115,6 +115,8 @@ function ListMenuItem:init()
             h = self.height
         },
         linesize = self.underline_h,
+        focus_linesize = Size.line.focus_indicator,
+        background = Blitbuffer.COLOR_WHITE,
         -- widget : will be filled in self:update()
     }
     self[1] = self._underline_container
@@ -418,6 +420,13 @@ function ListMenuItem:update()
             end
             local wmain_right_padding = Screen:scaleBySize(10) -- used only for next calculation
             local wmain_width = dimen.w - wleft_width - wmain_left_padding - wmain_right_padding - wright_width - wright_right_padding
+            -- Keep the focus underline clear of the cover on the left and of the corner mark
+            -- on the right, so moving it repaints nothing else. It may run under the right
+            -- hand column, just not into the corner.
+            local line_left = wleft_width + wmain_left_padding
+            local line_right = dimen.w - math.max(corner_mark_size, 0) - Screen:scaleBySize(6)
+            self._underline_container.line_x_offset = line_left
+            self._underline_container.line_width = math.max(line_right - line_left, wmain_width)
 
             local fontname_title = "cfont"
             local fontname_authors = "cfont"
@@ -791,13 +800,23 @@ function ListMenuItem:paintTo(bb, x, y)
 end
 
 -- As done in MenuItem
+function ListMenuItem:getFocusIndicatorRegion()
+    return self._underline_container and self._underline_container:getLineRegion()
+end
+
+function ListMenuItem:repaintFocusIndicator(bb)
+    return self._underline_container and self._underline_container:repaintFocusBar(bb)
+end
+
 function ListMenuItem:onFocus()
     self._underline_container.color = Blitbuffer.COLOR_BLACK
+    self._underline_container.focused = true
     return true
 end
 
 function ListMenuItem:onUnfocus()
     self._underline_container.color = Blitbuffer.COLOR_WHITE
+    self._underline_container.focused = false
     return true
 end
 
