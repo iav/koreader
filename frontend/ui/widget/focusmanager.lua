@@ -304,10 +304,6 @@ function FocusManager:onFocusMove(args)
                 bar_a = current_item:getFocusIndicatorRegion()
                 bar_b = next_item:getFocusIndicatorRegion()
             end
-            local region
-            if not (bar_a and bar_b) and current_item.dimen and next_item.dimen then
-                region = current_item.dimen:combine(next_item.dimen)
-            end
             if bar_a and bar_b and UIManager:getTopmostVisibleWidget() == parent then
                 -- Only the two focus bars changed: paint them, and refresh each on its own,
                 -- so nothing between the two rows is touched.
@@ -319,14 +315,11 @@ function FocusManager:onFocusMove(args)
                 else
                     UIManager:setDirty(parent, "fast")
                 end
-            elseif region and UIManager:getTopmostVisibleWidget() == parent then
-                -- We know where both items are: repaint just them, and refresh the box
-                -- holding both, instead of the whole window.
-                UIManager:widgetRepaint(current_item, current_item.dimen.x, current_item.dimen.y)
-                UIManager:widgetRepaint(next_item, next_item.dimen.x, next_item.dimen.y)
-                UIManager:setDirty(nil, "fast", region)
             else
-                UIManager:setDirty(parent, "fast", region)
+                -- NOTE: Ideally, we'd only have to repaint the specific subwidget we're
+                --       highlighting, but we may not know its exact coordinates, so,
+                --       redraw the parent widget instead.
+                UIManager:setDirty(parent, "fast")
             end
             break
         end
