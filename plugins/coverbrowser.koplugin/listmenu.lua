@@ -19,7 +19,6 @@ local RightContainer = require("ui/widget/container/rightcontainer")
 local Size = require("ui/size")
 local TextBoxWidget = require("ui/widget/textboxwidget")
 local TextWidget = require("ui/widget/textwidget")
-local TopContainer = require("ui/widget/container/topcontainer")
 local UnderlineContainer = require("ui/widget/container/underlinecontainer")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
@@ -144,10 +143,13 @@ function ListMenuItem:update()
         w = self.width,
         h = self.height - 2 * self.underline_h
     }
-    -- Leave the focus bar its room, taken from the text column only, and keep a gap
-    -- so descenders don't sit right on the bar.
+    -- The text hangs from the top of the row, so what is left for it is the row minus
+    -- that padding, the room the focus bar needs at the bottom, and a gap above the bar
+    -- so descenders don't sit on it.
+    local text_top_padding = Size.padding.small
     local text_dimen = dimen:copy()
-    text_dimen.h = dimen.h - math.max(Size.line.focus_indicator - self.underline_h, 0)
+    text_dimen.h = dimen.h - text_top_padding
+                           - math.max(Size.line.focus_indicator - self.underline_h, 0)
                            - Size.padding.small
     -- The shortcut square is painted over the bottom left corner, and the focus bar must
     -- not run under it: both need that corner kept free of anything else
@@ -409,10 +411,8 @@ function ListMenuItem:update()
                 for i, w in ipairs(wright_items) do
                     wright_width = math.max(wright_width, w:getSize().w)
                 end
-                wright = TopContainer:new{
-                    dimen = Geom:new{ w = wright_width, h = text_dimen.h },
-                    VerticalGroup:new(wright_items),
-                }
+                table.insert(wright_items, 1, VerticalSpan:new{ width = text_top_padding })
+                wright = VerticalGroup:new(wright_items)
                 wright_right_padding = Screen:scaleBySize(10)
             end
 
@@ -601,11 +601,14 @@ function ListMenuItem:update()
             end
 
             local wmain_group = VerticalGroup:new{
+                VerticalSpan:new{ width = text_top_padding },
                 wtitle,
                 wauthors,
             }
+            -- Hang the text from the top of the row: the room the focus bar needs is at
+            -- the bottom, and centering would hand half of it back to the text.
             local wmain = LeftContainer:new{
-                dimen = text_dimen:copy(),
+                dimen = Geom:new{ w = text_dimen.w, h = wmain_group:getSize().h },
                 wmain_group,
             }
 
@@ -637,17 +640,18 @@ function ListMenuItem:update()
             end
             -- add padded main widget
             table.insert(widget, LeftContainer:new{
-                    dimen = text_dimen:copy(),
+                    dimen = Geom:new{ w = text_dimen.w, h = wmain:getSize().h },
                     wmain
                 })
             -- add right widget
             if wright then
+                local wright_group = HorizontalGroup:new{
+                    wright,
+                    HorizontalSpan:new{ width = wright_right_padding },
+                }
                 table.insert(widget, RightContainer:new{
-                    dimen = dimen:copy(),
-                    HorizontalGroup:new{
-                        wright,
-                        HorizontalSpan:new{ width = wright_right_padding },
-                    },
+                    dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
+                    wright_group,
                 })
             end
 
