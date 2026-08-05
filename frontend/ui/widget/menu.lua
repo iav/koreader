@@ -489,11 +489,11 @@ function MenuItem:getDotsText(face)
 end
 
 function MenuItem:getFocusIndicatorRegion()
-    return self._underline_container and self._underline_container:getLineRegion()
+    return self._underline_container and self._underline_container:getFocusIndicatorRegion()
 end
 
 function MenuItem:repaintFocusIndicator(bb)
-    return self._underline_container and self._underline_container:repaintFocusBar(bb)
+    return self._underline_container and self._underline_container:repaintFocusIndicator(bb)
 end
 
 function MenuItem:onFocus()

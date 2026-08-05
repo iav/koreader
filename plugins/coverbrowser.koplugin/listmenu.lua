@@ -192,8 +192,9 @@ function ListMenuItem:update()
         }
         local pad_width = Screen:scaleBySize(10) -- on the left, in between, and on the right
         local wleft_width = dimen.w - wright:getWidth() - 3*pad_width - shortcut_width
-        self._underline_container.line_x_offset = pad_width + shortcut_width
-        self._underline_container.line_width = dimen.w - self._underline_container.line_x_offset
+        local line_left = pad_width + shortcut_width
+        self._underline_container.line_x_offset = line_left
+        self._underline_container.line_width = dimen.w - line_left
         local wleft = TextBoxWidget:new{
             text = BD.directory(self.text),
             face = Font:getFace("cfont", _fontSize(20, 24)),
@@ -713,9 +714,9 @@ function ListMenuItem:update()
                 -- reduce font size for next loop, in case text widget is too large to fit into ListMenuItem
                 fontsize_no_bookinfo = fontsize_no_bookinfo - fontsize_dec_step
             until text_widget:getSize().h <= text_dimen.h
-            self._underline_container.line_x_offset = Screen:scaleBySize(10) + shortcut_width
-            self._underline_container.line_width = math.max(
-                self:getFocusLineRight(dimen.w) - self._underline_container.line_x_offset, 0)
+            local line_left = Screen:scaleBySize(10) + shortcut_width
+            self._underline_container.line_x_offset = line_left
+            self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
             widget = LeftContainer:new{
                 dimen = text_dimen:copy(),
                 HorizontalGroup:new{
@@ -820,11 +821,11 @@ end
 
 -- As done in MenuItem
 function ListMenuItem:getFocusIndicatorRegion()
-    return self._underline_container and self._underline_container:getLineRegion()
+    return self._underline_container and self._underline_container:getFocusIndicatorRegion()
 end
 
 function ListMenuItem:repaintFocusIndicator(bb)
-    return self._underline_container and self._underline_container:repaintFocusBar(bb)
+    return self._underline_container and self._underline_container:repaintFocusIndicator(bb)
 end
 
 function ListMenuItem:onFocus()

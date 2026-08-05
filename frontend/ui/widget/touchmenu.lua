@@ -161,11 +161,11 @@ function TouchMenuItem:init()
 end
 
 function TouchMenuItem:getFocusIndicatorRegion()
-    return self._underline_container and self._underline_container:getLineRegion()
+    return self._underline_container and self._underline_container:getFocusIndicatorRegion()
 end
 
 function TouchMenuItem:repaintFocusIndicator(bb)
-    return self._underline_container and self._underline_container:repaintFocusBar(bb)
+    return self._underline_container and self._underline_container:repaintFocusIndicator(bb)
 end
 
 function TouchMenuItem:onFocus()

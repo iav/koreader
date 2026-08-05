@@ -6,6 +6,7 @@ local UIManager = require("ui/uimanager")
 local bit = require("bit")
 local logger = require("logger")
 local util = require("util")
+local Screen = Device.screen
 --[[
 Wrapper Widget that manages focus for a whole dialog
 
@@ -299,22 +300,22 @@ function FocusManager:onFocusMove(args)
             next_item:handleEvent(Event:new("Focus"))
             -- Trigger a fast repaint, this does not count toward a flashing eink refresh.
             local parent = self.show_parent or self
-            local bar_a, bar_b
+            local prev_bar, next_bar
             -- Painting outside UIManager's paint pass skips Screen:beforePaint(), which is
             -- where forced HW rotation gets asserted; leave those screens the stock path.
-            if not Device.screen.forced_rotation
+            if not Screen.forced_rotation
                     and current_item.getFocusIndicatorRegion and next_item.getFocusIndicatorRegion then
-                bar_a = current_item:getFocusIndicatorRegion()
-                bar_b = next_item:getFocusIndicatorRegion()
+                prev_bar = current_item:getFocusIndicatorRegion()
+                next_bar = next_item:getFocusIndicatorRegion()
             end
-            if bar_a and bar_b and UIManager:getTopmostVisibleWidget() == parent then
+            if prev_bar and next_bar and UIManager:getTopmostVisibleWidget() == parent then
                 -- Only the two focus bars changed: paint them, and refresh each on its own,
                 -- so nothing between the two rows is touched.
-                local bb = Device.screen.bb
+                local bb = Screen.bb
                 if current_item.repaintFocusIndicator and next_item.repaintFocusIndicator
                         and current_item:repaintFocusIndicator(bb) and next_item:repaintFocusIndicator(bb) then
-                    UIManager:setDirty(nil, "fast", bar_a)
-                    UIManager:setDirty(nil, "fast", bar_b)
+                    UIManager:setDirty(nil, "fast", prev_bar)
+                    UIManager:setDirty(nil, "fast", next_bar)
                 else
                     UIManager:setDirty(parent, "fast")
                 end
