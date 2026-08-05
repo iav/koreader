@@ -300,7 +300,10 @@ function FocusManager:onFocusMove(args)
             -- Trigger a fast repaint, this does not count toward a flashing eink refresh.
             local parent = self.show_parent or self
             local bar_a, bar_b
-            if current_item.getFocusIndicatorRegion and next_item.getFocusIndicatorRegion then
+            -- Painting outside UIManager's paint pass skips Screen:beforePaint(), which is
+            -- where forced HW rotation gets asserted; leave those screens the stock path.
+            if not Device.screen.forced_rotation
+                    and current_item.getFocusIndicatorRegion and next_item.getFocusIndicatorRegion then
                 bar_a = current_item:getFocusIndicatorRegion()
                 bar_b = next_item:getFocusIndicatorRegion()
             end
