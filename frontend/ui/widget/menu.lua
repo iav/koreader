@@ -426,7 +426,7 @@ function MenuItem:init()
         color = self.line_color,
         linesize = self.linesize,
         focus_linesize = Size.line.focus_indicator,
-        background = Blitbuffer.COLOR_WHITE,
+        background = self.text_bgcolor or Blitbuffer.COLOR_WHITE,
         vertical_align = "center",
         padding = 0,
         dimen = Geom:new{

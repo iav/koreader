@@ -774,7 +774,7 @@ function ListMenuItem:paintTo(bb, x, y)
         else
             ix = 0
         end
-        local iy = self.height - self.shortcut_icon.dimen.h - self.shortcut_icon.bordersize
+        local iy = self.height - self.shortcut_icon.dimen.h - 2 * self.shortcut_icon.bordersize
         self.shortcut_icon:paintTo(bb, x+ix, y+iy)
     end
 
