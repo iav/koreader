@@ -140,6 +140,9 @@ function ListMenuItem:update()
     -- Leave the focus bar its room, taken from the text column only
     local text_dimen = dimen:copy()
     text_dimen.h = dimen.h - math.max(Size.line.focus_indicator - self.underline_h, 0)
+    -- The shortcut square is painted over the bottom left corner, and the focus bar must
+    -- not run under it: both need that corner kept free of anything else
+    local shortcut_width = self.shortcut_icon and self.shortcut_icon.dimen.w or 0
 
     local function _fontSize(nominal, max)
         -- The nominal font size is based on 64px ListMenuItem height.
@@ -182,8 +185,6 @@ function ListMenuItem:update()
             face = Font:getFace("infont", _fontSize(14, 18)),
         }
         local pad_width = Screen:scaleBySize(10) -- on the left, in between, and on the right
-        -- The shortcut is painted over the bottom left corner: keep the name clear of it
-        local shortcut_width = self.shortcut_icon and self.shortcut_icon.dimen.w or 0
         local wleft_width = dimen.w - wright:getWidth() - 3*pad_width - shortcut_width
         self._underline_container.line_x_offset = pad_width + shortcut_width
         self._underline_container.line_width = dimen.w - self._underline_container.line_x_offset
@@ -193,7 +194,7 @@ function ListMenuItem:update()
             width = wleft_width,
             alignment = "left",
             bold = true,
-            height = dimen.h,
+            height = text_dimen.h,
             height_adjust = true,
             height_overflow_show_ellipsis = true,
         }
@@ -250,9 +251,8 @@ function ListMenuItem:update()
             -- Build the left widget : image if wanted
             local wleft = nil
             local wleft_width = 0 -- if not do_cover_image
-            if not self.do_cover_image and self.shortcut_icon then
-                -- No cover to paint the shortcut over: keep that corner free of text
-                wleft_width = self.shortcut_icon.dimen.w
+            if not self.do_cover_image then
+                wleft_width = shortcut_width
             end
             local wleft_height
             if self.do_cover_image then
@@ -702,17 +702,19 @@ function ListMenuItem:update()
                 text_widget = TextBoxWidget:new{
                     text = text .. hint,
                     face = Font:getFace("cfont", fontsize_no_bookinfo),
-                    width = dimen.w - 2 * Screen:scaleBySize(10) - wright_width - wright_right_padding,
+                    width = dimen.w - 2 * Screen:scaleBySize(10) - shortcut_width - wright_width - wright_right_padding,
                     alignment = "left",
                     fgcolor = fgcolor,
                 }
                 -- reduce font size for next loop, in case text widget is too large to fit into ListMenuItem
                 fontsize_no_bookinfo = fontsize_no_bookinfo - fontsize_dec_step
             until text_widget:getSize().h <= text_dimen.h
+            self._underline_container.line_x_offset = Screen:scaleBySize(10) + shortcut_width
+            self._underline_container.line_width = dimen.w - self._underline_container.line_x_offset
             widget = LeftContainer:new{
                 dimen = text_dimen:copy(),
                 HorizontalGroup:new{
-                    HorizontalSpan:new{ width = Screen:scaleBySize(10) },
+                    HorizontalSpan:new{ width = Screen:scaleBySize(10) + shortcut_width },
                     text_widget
                 },
             }
