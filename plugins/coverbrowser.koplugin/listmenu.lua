@@ -19,6 +19,7 @@ local RightContainer = require("ui/widget/container/rightcontainer")
 local Size = require("ui/size")
 local TextBoxWidget = require("ui/widget/textboxwidget")
 local TextWidget = require("ui/widget/textwidget")
+local TopContainer = require("ui/widget/container/topcontainer")
 local UnderlineContainer = require("ui/widget/container/underlinecontainer")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
@@ -143,9 +144,11 @@ function ListMenuItem:update()
         w = self.width,
         h = self.height - 2 * self.underline_h
     }
-    -- Leave the focus bar its room, taken from the text column only
+    -- Leave the focus bar its room, taken from the text column only, and keep a gap
+    -- so descenders don't sit right on the bar.
     local text_dimen = dimen:copy()
     text_dimen.h = dimen.h - math.max(Size.line.focus_indicator - self.underline_h, 0)
+                           - Size.padding.small
     -- The shortcut square is painted over the bottom left corner, and the focus bar must
     -- not run under it: both need that corner kept free of anything else
     local shortcut_width = self.shortcut_icon and self.shortcut_icon.dimen.w or 0
@@ -406,8 +409,8 @@ function ListMenuItem:update()
                 for i, w in ipairs(wright_items) do
                     wright_width = math.max(wright_width, w:getSize().w)
                 end
-                wright = CenterContainer:new{
-                    dimen = Geom:new{ w = wright_width, h = dimen.h },
+                wright = TopContainer:new{
+                    dimen = Geom:new{ w = wright_width, h = text_dimen.h },
                     VerticalGroup:new(wright_items),
                 }
                 wright_right_padding = Screen:scaleBySize(10)
