@@ -118,7 +118,11 @@ function UnderlineContainer:paintTo(bb, x, y)
     self[1]:paintTo(bb, x, p_y)
     local bottom = y + container_size.h
     bb:paintRect(line_x, bottom - self.linesize, line_width, self.linesize, self.color)
-    self:_paintFocusBar(bb, line_x, bottom, line_width)
+    -- Only draw the bar here, never clear it: the strip may overlap the content we
+    -- just painted, and a repaint of the whole widget has nothing to erase anyway.
+    if self.focused then
+        self:_paintFocusBar(bb, line_x, bottom, line_width)
+    end
 end
 
 return UnderlineContainer
