@@ -127,6 +127,12 @@ function ListMenuItem:init()
     self.init_done = true
 end
 
+--- Where the focus underline has to stop: paintTo puts the dogear over that corner
+--- afterwards, and a focus-only repaint would slice it without redrawing it.
+function ListMenuItem:getFocusLineRight(width)
+    return width - math.max(corner_mark_size, 0) - Screen:scaleBySize(6)
+end
+
 function ListMenuItem:update()
     -- We will be a distinctive widget whether we are a directory,
     -- a known file with image / without image, or a not yet known file
@@ -431,13 +437,11 @@ function ListMenuItem:update()
             end
             local wmain_right_padding = Screen:scaleBySize(10) -- used only for next calculation
             local wmain_width = dimen.w - wleft_width - wmain_left_padding - wmain_right_padding - wright_width - wright_right_padding
-            -- Keep the focus underline clear of the cover on the left and of the corner mark
-            -- on the right, so moving it repaints nothing else. It may run under the right
-            -- hand column, just not into the corner.
+            -- Keep the focus underline clear of the cover: it may run under the right hand
+            -- column, just not over anything painted on top of the row.
             local line_left = wleft_width + wmain_left_padding
-            local line_right = dimen.w - math.max(corner_mark_size, 0) - Screen:scaleBySize(6)
             self._underline_container.line_x_offset = line_left
-            self._underline_container.line_width = math.max(line_right - line_left, wmain_width)
+            self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
 
             local fontname_title = "cfont"
             local fontname_authors = "cfont"
@@ -710,7 +714,8 @@ function ListMenuItem:update()
                 fontsize_no_bookinfo = fontsize_no_bookinfo - fontsize_dec_step
             until text_widget:getSize().h <= text_dimen.h
             self._underline_container.line_x_offset = Screen:scaleBySize(10) + shortcut_width
-            self._underline_container.line_width = dimen.w - self._underline_container.line_x_offset
+            self._underline_container.line_width = math.max(
+                self:getFocusLineRight(dimen.w) - self._underline_container.line_x_offset, 0)
             widget = LeftContainer:new{
                 dimen = text_dimen:copy(),
                 HorizontalGroup:new{
