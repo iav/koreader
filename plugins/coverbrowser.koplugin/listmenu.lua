@@ -137,6 +137,9 @@ function ListMenuItem:update()
         w = self.width,
         h = self.height - 2 * self.underline_h
     }
+    -- Leave the focus bar its room, taken from the text column only
+    local text_dimen = dimen:copy()
+    text_dimen.h = dimen.h - math.max(Size.line.focus_indicator - self.underline_h, 0)
 
     local function _fontSize(nominal, max)
         -- The nominal font size is based on 64px ListMenuItem height.
@@ -179,7 +182,11 @@ function ListMenuItem:update()
             face = Font:getFace("infont", _fontSize(14, 18)),
         }
         local pad_width = Screen:scaleBySize(10) -- on the left, in between, and on the right
-        local wleft_width = dimen.w - wright:getWidth() - 3*pad_width
+        -- The shortcut is painted over the bottom left corner: keep the name clear of it
+        local shortcut_width = self.shortcut_icon and self.shortcut_icon.dimen.w or 0
+        local wleft_width = dimen.w - wright:getWidth() - 3*pad_width - shortcut_width
+        self._underline_container.line_x_offset = pad_width + shortcut_width
+        self._underline_container.line_width = dimen.w - self._underline_container.line_x_offset
         local wleft = TextBoxWidget:new{
             text = BD.directory(self.text),
             face = Font:getFace("cfont", _fontSize(20, 24)),
@@ -195,7 +202,7 @@ function ListMenuItem:update()
             LeftContainer:new{
                 dimen = dimen:copy(),
                 HorizontalGroup:new{
-                    HorizontalSpan:new{ width = pad_width },
+                    HorizontalSpan:new{ width = pad_width + shortcut_width },
                     wleft,
                 }
             },
@@ -243,6 +250,10 @@ function ListMenuItem:update()
             -- Build the left widget : image if wanted
             local wleft = nil
             local wleft_width = 0 -- if not do_cover_image
+            if not self.do_cover_image and self.shortcut_icon then
+                -- No cover to paint the shortcut over: keep that corner free of text
+                wleft_width = self.shortcut_icon.dimen.w
+            end
             local wleft_height
             if self.do_cover_image then
                 wleft_height = dimen.h
@@ -544,7 +555,7 @@ function ListMenuItem:update()
                     build_authors()
                     height = height + wauthors:getSize().h
                 end
-                if height <= dimen.h then
+                if height <= text_dimen.h then
                     -- We fit!
                     break
                 end
@@ -558,7 +569,7 @@ function ListMenuItem:update()
                     local authors_min_height = 2 * authors_line_height -- unscaled_size_check: ignore
                     -- Chop lines, starting with authors, until
                     -- both labels fit in the allocated space.
-                    while title_height + authors_height > dimen.h do
+                    while title_height + authors_height > text_dimen.h do
                         if authors_height > authors_min_height then
                             authors_height = authors_height - authors_line_height
                         elseif title_height > title_min_height then
@@ -581,12 +592,13 @@ function ListMenuItem:update()
                 logger.dbg(title, "recalculate title/author with", fontsize_title)
             end
 
+            local wmain_group = VerticalGroup:new{
+                wtitle,
+                wauthors,
+            }
             local wmain = LeftContainer:new{
-                dimen = dimen:copy(),
-                VerticalGroup:new{
-                    wtitle,
-                    wauthors,
-                }
+                dimen = text_dimen:copy(),
+                wmain_group,
             }
 
             -- Build the final widget
@@ -610,13 +622,14 @@ function ListMenuItem:update()
             else
                 -- pad main widget on the left
                 wmain = HorizontalGroup:new{
+                        HorizontalSpan:new{ width = wleft_width },
                         HorizontalSpan:new{ width = wmain_left_padding },
                         wmain
                 }
             end
             -- add padded main widget
             table.insert(widget, LeftContainer:new{
-                    dimen = dimen:copy(),
+                    dimen = text_dimen:copy(),
                     wmain
                 })
             -- add right widget
@@ -695,9 +708,9 @@ function ListMenuItem:update()
                 }
                 -- reduce font size for next loop, in case text widget is too large to fit into ListMenuItem
                 fontsize_no_bookinfo = fontsize_no_bookinfo - fontsize_dec_step
-            until text_widget:getSize().h <= dimen.h
+            until text_widget:getSize().h <= text_dimen.h
             widget = LeftContainer:new{
-                dimen = dimen:copy(),
+                dimen = text_dimen:copy(),
                 HorizontalGroup:new{
                     HorizontalSpan:new{ width = Screen:scaleBySize(10) },
                     text_widget
@@ -746,15 +759,14 @@ function ListMenuItem:paintTo(bb, x, y)
 
     -- to which we paint over the shortcut icon
     if self.shortcut_icon then
-        -- align it on bottom left corner of sub-widget
-        local target = self[1][1][2]
+        -- align it on the bottom left corner of the item
         local ix
         if BD.mirroredUILayout() then
-            ix = target.dimen.w - self.shortcut_icon.dimen.w - 2 * self.shortcut_icon.bordersize
+            ix = self.width - self.shortcut_icon.dimen.w - 2 * self.shortcut_icon.bordersize
         else
             ix = 0
         end
-        local iy = target.dimen.h - self.shortcut_icon.dimen.h - self.shortcut_icon.bordersize
+        local iy = self.height - self.shortcut_icon.dimen.h - self.shortcut_icon.bordersize
         self.shortcut_icon:paintTo(bb, x+ix, y+iy)
     end
 
