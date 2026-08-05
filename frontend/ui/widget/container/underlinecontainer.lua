@@ -44,7 +44,7 @@ function UnderlineContainer:getLineRegion()
         x = line_x,
         y = self:_focusBarTop(self.dimen.y + self:getSize().h),
         w = line_width,
-        h = h,
+        h = h + self.linesize,
     }
 end
 
@@ -81,13 +81,15 @@ function UnderlineContainer:_paintFocusBar(bb, line_x, bottom, line_width)
     bb:paintRect(line_x, self:_focusBarTop(bottom), line_width, h, color)
 end
 
---- Repaint just the focus bar, without touching the rest of the widget.
---- Used when only the focus moved: nothing else on the row has changed.
+--- Repaint the focus strip -- our line and the bar above it -- without touching the
+--- rest of the widget. Used when only the focus moved: nothing else on the row changed.
 function UnderlineContainer:repaintFocusBar(bb)
     if not self.dimen or not self.background then return false end
     if self:_focusBarHeight() == 0 then return false end
     local line_x, line_width = self:_lineGeometry(self.dimen.x)
-    self:_paintFocusBar(bb, line_x, self.dimen.y + self:getSize().h, line_width)
+    local bottom = self.dimen.y + self:getSize().h
+    self:_paintFocusBar(bb, line_x, bottom, line_width)
+    bb:paintRect(line_x, bottom - self.linesize, line_width, self.linesize, self.color)
     return true
 end
 
