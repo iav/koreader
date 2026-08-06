@@ -316,18 +316,25 @@ function FocusManager:onFocusMove(args)
                     UIManager:setDirty(nil, "fast", prev_bar)
                     UIManager:setDirty(nil, "fast", next_bar)
                 else
-                    UIManager:setDirty(parent, "fast")
+                    self:_repaintParent(parent, current_item, next_item)
                 end
             else
-                -- NOTE: Ideally, we'd only have to repaint the specific subwidget we're
-                --       highlighting, but we may not know its exact coordinates, so,
-                --       redraw the parent widget instead.
-                UIManager:setDirty(parent, "fast")
+                self:_repaintParent(parent, current_item, next_item)
             end
             break
         end
     end
     return true
+end
+
+-- The widget has to be repainted whole, but only the two rows change: refresh the box
+-- holding them both, and the whole thing when we don't know where one of them is.
+function FocusManager:_repaintParent(parent, current_item, next_item)
+    local region
+    if current_item.dimen and next_item.dimen then
+        region = current_item.dimen:combine(next_item.dimen)
+    end
+    UIManager:setDirty(parent, "fast", region)
 end
 
 function FocusManager:onPhysicalKeyboardConnected()
