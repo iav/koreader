@@ -35,14 +35,12 @@ end
 --- Only after paintTo: dimen may be set from the outside, its coordinates are not.
 function UnderlineContainer:getFocusIndicatorRegion()
     if not self._painted then return end
-    local h = self:_focusBarHeight()
-    if h == 0 then return end
     local line_x, line_width = self:_lineGeometry()
     return Geom:new{
         x = line_x,
         y = self:_focusBarTop(self.dimen.y + self:getSize().h),
         w = line_width,
-        h = h + self.linesize,
+        h = self:_focusBarHeight() + self.linesize,
     }
 end
 
@@ -78,8 +76,10 @@ end
 
 --- Repaint the strip -- our line and the bar above it -- and nothing else of the widget.
 function UnderlineContainer:repaintFocusIndicator(bb)
-    if not self._painted or not self.background then return false end
-    if self:_focusBarHeight() == 0 then return false end
+    if not self._painted then return false end
+    -- A bar of its own needs somewhere to go when unfocused; a line that merely changes
+    -- colour just gets repainted.
+    if self:_focusBarHeight() > 0 and not self.background then return false end
     local line_x, line_width = self:_lineGeometry()
     local bottom = self.dimen.y + self:getSize().h
     self:_paintFocusBar(bb, line_x, bottom, line_width)
