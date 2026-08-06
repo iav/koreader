@@ -309,8 +309,7 @@ function FocusManager:onFocusMove(args)
                 next_bar = next_item:getFocusIndicatorRegion()
             end
             if prev_bar and next_bar and UIManager:getTopmostVisibleWidget() == parent then
-                -- Only the two focus bars changed: paint them, and refresh each on its own,
-                -- so nothing between the two rows is touched.
+                -- Refresh each bar on its own, so nothing between the two rows is touched.
                 local bb = Screen.bb
                 if current_item.repaintFocusIndicator and next_item.repaintFocusIndicator
                         and current_item:repaintFocusIndicator(bb) and next_item:repaintFocusIndicator(bb) then

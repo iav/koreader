@@ -20,7 +20,7 @@ local UnderlineContainer = WidgetContainer:extend{
     vertical_align = "top",
     line_width = nil, -- (Don't use this, it's there because of the complex and ugly layout in TouchMenuItem)
     line_x_offset = nil, -- shifts the line right (left in RTL), to keep it clear of other content
-    background = nil, -- what to clear the line's own area with, when its thickness varies
+    background = nil, -- what to clear the strip with; without it, the bar can only be drawn
 }
 
 function UnderlineContainer:getSize()
@@ -32,8 +32,7 @@ function UnderlineContainer:getSize()
 end
 
 --- The strip this container paints its line and focus bar into, in screen coordinates.
---- Only meaningful once we've been painted: dimen may be set from the outside, but the
---- coordinates in it are only ours after paintTo.
+--- Only after paintTo: dimen may be set from the outside, its coordinates are not.
 function UnderlineContainer:getFocusIndicatorRegion()
     if not self._painted then return end
     local h = self:_focusBarHeight()
@@ -56,15 +55,13 @@ function UnderlineContainer:_lineGeometry()
     return self.dimen.x + line_x_offset, line_width
 end
 
--- Height of the focus bar itself: the line keeps its own thickness out of the total,
--- so the two together always occupy focus_linesize and the line is never overdrawn.
+-- The bar, without the line: together they occupy focus_linesize.
 function UnderlineContainer:_focusBarHeight()
     if not self.focus_linesize then return 0 end
     return math.max(self.focus_linesize - self.linesize, 0)
 end
 
--- Where the focus bar lives: directly on top of our own line, so dropping the bar leaves
--- that line untouched and there is nothing to restore.
+-- Right on top of our line, so dropping the bar leaves the line untouched.
 function UnderlineContainer:_focusBarTop(bottom)
     return bottom - self.linesize - self:_focusBarHeight()
 end
@@ -79,8 +76,7 @@ function UnderlineContainer:_paintFocusBar(bb, line_x, bottom, line_width)
     bb:paintRect(line_x, self:_focusBarTop(bottom), line_width, h, color)
 end
 
---- Repaint the focus strip -- our line and the bar above it -- without touching the
---- rest of the widget. Used when only the focus moved: nothing else on the row changed.
+--- Repaint the strip -- our line and the bar above it -- and nothing else of the widget.
 function UnderlineContainer:repaintFocusIndicator(bb)
     if not self._painted or not self.background then return false end
     if self:_focusBarHeight() == 0 then return false end
