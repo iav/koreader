@@ -6,6 +6,7 @@ local UIManager = require("ui/uimanager")
 local bit = require("bit")
 local logger = require("logger")
 local util = require("util")
+local Screen = Device.screen
 --[[
 Wrapper Widget that manages focus for a whole dialog
 
@@ -296,16 +297,46 @@ function FocusManager:onFocusMove(args)
         if self.layout[self.selected.y][self.selected.x] ~= current_item
         or not self.layout[self.selected.y][self.selected.x].is_inactive then
             -- we found a different object to focus
+            local next_item = self.layout[self.selected.y][self.selected.x]
             current_item:handleEvent(Event:new("Unfocus"))
-            self.layout[self.selected.y][self.selected.x]:handleEvent(Event:new("Focus"))
-            -- Trigger a fast repaint, this does not count toward a flashing eink refresh
-            -- NOTE: Ideally, we'd only have to repaint the specific subwidget we're highlighting,
-            --       but we may not know its exact coordinates, so, redraw the parent widget instead.
-            UIManager:setDirty(self.show_parent or self, "fast")
+            next_item:handleEvent(Event:new("Focus"))
+            -- Trigger a fast repaint, this does not count toward a flashing eink refresh.
+            local parent = self.show_parent or self
+            local prev_bar, next_bar
+            -- Painting outside UIManager's paint pass skips Screen:beforePaint(), which is
+            -- where forced HW rotation gets asserted; leave those screens the stock path.
+            if not Screen.forced_rotation
+                    and current_item.getFocusIndicatorRegion and next_item.getFocusIndicatorRegion then
+                prev_bar = current_item:getFocusIndicatorRegion()
+                next_bar = next_item:getFocusIndicatorRegion()
+            end
+            if prev_bar and next_bar and UIManager:getTopmostVisibleWidget() == parent then
+                -- Refresh each bar on its own, so nothing between the two rows is touched.
+                local bb = Screen.bb
+                if current_item.repaintFocusIndicator and next_item.repaintFocusIndicator
+                        and current_item:repaintFocusIndicator(bb) and next_item:repaintFocusIndicator(bb) then
+                    UIManager:setDirty(nil, "fast", prev_bar)
+                    UIManager:setDirty(nil, "fast", next_bar)
+                else
+                    self:_repaintParent(parent, current_item, next_item)
+                end
+            else
+                self:_repaintParent(parent, current_item, next_item)
+            end
             break
         end
     end
     return true
+end
+
+-- The widget has to be repainted whole, but only the two rows change: refresh the box
+-- holding them both, and the whole thing when we don't know where one of them is.
+function FocusManager:_repaintParent(parent, current_item, next_item)
+    local region
+    if current_item.dimen and next_item.dimen then
+        region = current_item.dimen:combine(next_item.dimen)
+    end
+    UIManager:setDirty(parent, "fast", region)
 end
 
 function FocusManager:onPhysicalKeyboardConnected()

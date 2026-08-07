@@ -425,6 +425,8 @@ function MenuItem:init()
     self._underline_container = UnderlineContainer:new{
         color = self.line_color,
         linesize = self.linesize,
+        focus_linesize = Size.line.focus_indicator,
+        background = self.text_bgcolor or Blitbuffer.COLOR_WHITE,
         vertical_align = "center",
         padding = 0,
         dimen = Geom:new{
@@ -486,19 +488,23 @@ function MenuItem:getDotsText(face)
     return _dots_cached_info.text, _dots_cached_info.min_width
 end
 
+function MenuItem:getFocusIndicatorRegion()
+    return self._underline_container and self._underline_container:getFocusIndicatorRegion()
+end
+
+function MenuItem:repaintFocusIndicator(bb)
+    return self._underline_container and self._underline_container:repaintFocusIndicator(bb)
+end
+
 function MenuItem:onFocus()
     self._underline_container.color = Blitbuffer.COLOR_BLACK
-    -- NOTE: Medium is really, really, really thin; so we'd ideally swap to something thicker...
-    --       Unfortunately, this affects vertical text positioning,
-    --       leading to an unsightly refresh of the item :/.
-    --self._underline_container.linesize = Size.line.thick
+    self._underline_container.focused = true
     return true
 end
 
 function MenuItem:onUnfocus()
     self._underline_container.color = self.line_color
-    -- See above for reasoning.
-    --self._underline_container.linesize = self.linesize
+    self._underline_container.focused = false
     return true
 end
 
