@@ -307,7 +307,7 @@ function FocusManager:onFocusMove(args)
             local next_item = self.layout[self.selected.y][self.selected.x]
             current_item:handleEvent(Event:new("Unfocus"))
             next_item:handleEvent(Event:new("Focus"))
-            self:_repaintFocusChange(current_item, next_item)
+            self:repaintAfterFocusMove(current_item, next_item)
             break
         end
     end
@@ -315,6 +315,11 @@ function FocusManager:onFocusMove(args)
 end
 
 -- An item that knows where its focus indicator is, and can paint it on its own.
+-- We ask the item itself, by method name, instead of testing its class: any widget
+-- implementing both methods joins in, and none of them has to inherit from ours.
+-- The flip side is that a rename in here silently drops every implementor back to
+-- the slow path, with no error to notice it by, so treat the two names, the
+-- Screen.bb argument and the screen-absolute regions as the published contract.
 local function canFastRepaint(item)
     return item.getFocusIndicatorRegion and item.repaintFocusIndicator
 end
@@ -323,7 +328,19 @@ end
 --- When both items can paint their focus indicator on their own, we paint and refresh
 --- only those two indicators; otherwise we let the parent repaint it all.
 --- A fast repaint does not count toward a flashing eink refresh.
-function FocusManager:_repaintFocusChange(prev_item, next_item)
+---
+--- The contract with an item that implements the fast path:
+--- * getFocusIndicatorRegion() returns the screen-absolute Geom of the indicator, or
+---   nil to say "not right now": a scrolled-out row, a layout mid-rebuild. We take
+---   nil as the item asking for the slow path, not as an error.
+--- * repaintFocusIndicator(bb) paints into the framebuffer we hand it and returns
+---   true when it did. Nothing clips that write for the item, so an item inside a
+---   ScrollableContainer clips its own region against the visible window first.
+---
+--- A widget that scrolls to follow the focus overrides this method, scrolls, and then
+--- calls us: we paint the indicator where the item has just landed, rather than where
+--- it stood before the scroll.
+function FocusManager:repaintAfterFocusMove(prev_item, next_item)
     local parent = self.show_parent or self
     -- Painting outside UIManager's paint-pass skips Screen:beforePaint(), which is
     -- where forced HW rotation gets asserted; leave those screens the stock path.
@@ -398,6 +415,10 @@ FocusManager.NOT_FOCUS = 2
 FocusManager.FOCUS_ONLY_ON_NT = (Device:hasDPad() and not Device:isTouchDevice()) and 0 or FocusManager.NOT_FOCUS
 -- And in some cases, we may want to send both events *regardless* of heuristics or device caps
 FocusManager.FORCED_FOCUS = 4
+-- Tells a plugin that ships for several KOReader versions whether this one repaints the
+-- focus indicator on its own. A plugin cannot duck-check the two contract methods for
+-- this: those live on the items it builds, so it would only be asking about itself.
+FocusManager.HAS_FOCUS_INDICATOR_REPAINT = true
 
 --- Move focus to specified widget
 function FocusManager:moveFocusTo(x, y, focus_flags)
@@ -444,7 +465,7 @@ function FocusManager:moveFocusTo(x, y, focus_flags)
             if bit.band(focus_flags, FocusManager.NOT_FOCUS) ~= FocusManager.NOT_FOCUS then
                 target_item:handleEvent(Event:new("Focus"))
                 if unfocused_item then
-                    self:_repaintFocusChange(unfocused_item, target_item)
+                    self:repaintAfterFocusMove(unfocused_item, target_item)
                 else
                     -- We did not unfocus a single item, so there is nothing to narrow to.
                     UIManager:setDirty(self.show_parent or self, "fast")
