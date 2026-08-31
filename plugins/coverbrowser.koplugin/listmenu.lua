@@ -225,6 +225,14 @@ function ListMenuItem:update()
                 wleft,
             },
         }
+        -- The count shares the name's top padding, so the two keep one baseline.
+        local wright_group = VerticalGroup:new{
+            VerticalSpan:new{ width = text_top_padding },
+            HorizontalGroup:new{
+                wright,
+                HorizontalSpan:new{ width = pad_width },
+            },
+        }
         widget = OverlapGroup:new{
             dimen = dimen:copy(),
             LeftContainer:new{
@@ -232,11 +240,8 @@ function ListMenuItem:update()
                 wleft_group,
             },
             RightContainer:new{
-                dimen = dimen:copy(),
-                HorizontalGroup:new{
-                    wright,
-                    HorizontalSpan:new{ width = pad_width },
-                },
+                dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
+                wright_group,
             },
         }
     else -- file
@@ -750,12 +755,16 @@ function ListMenuItem:update()
                 widget,
             }
             if wright then -- last read date, in History, even for deleted files
-                table.insert(widget, RightContainer:new{
-                    dimen = dimen:copy(),
+                local wright_group = VerticalGroup:new{
+                    VerticalSpan:new{ width = text_top_padding },
                     HorizontalGroup:new{
                         wright,
                         HorizontalSpan:new{ width = wright_right_padding },
                     },
+                }
+                table.insert(widget, RightContainer:new{
+                    dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
+                    wright_group,
                 })
             end
         end
