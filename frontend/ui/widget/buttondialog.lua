@@ -357,8 +357,11 @@ function ButtonDialog:paintTo(...)
 end
 
 function ButtonDialog:repaintAfterFocusMove(prev_item, next_item)
-    -- If we're using a ScrollableContainer, ask it to scroll to the focused item
-    if self.cropping_widget then
+    -- If we're using a ScrollableContainer, ask it to scroll to the focused item.
+    -- Skip when _onPageScrollToRow is driving: ScrollableContainer has already
+    -- scrolled, and next_item.dimen still reflects the pre-scroll layout, so a
+    -- second _scrollBy here would overshoot.
+    if self.cropping_widget and not self._page_scroll_in_progress then
         if self.dimen and next_item and next_item.dimen then
             local button_y_offset = next_item.dimen.y - self.dimen.y - self.top_to_content_offset
             -- NOTE: The final argument ensures we'll always keep the neighboring item visible.
@@ -372,8 +375,12 @@ function ButtonDialog:repaintAfterFocusMove(prev_item, next_item)
 end
 
 function ButtonDialog:_onPageScrollToRow(row)
-    -- ScrollableContainer will pass us the row number of the top widget at the current scroll offset
+    -- ScrollableContainer will pass us the row number of the top widget at the current scroll offset.
+    -- Guard against the follow-focus scroll in repaintAfterFocusMove: the container
+    -- has already scrolled, so only the focus event and repaint are needed here.
+    self._page_scroll_in_progress = true
     self:moveFocusTo(1, row)
+    self._page_scroll_in_progress = nil
 end
 
 return ButtonDialog
