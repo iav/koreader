@@ -356,21 +356,19 @@ function ButtonDialog:paintTo(...)
     self.dimen = self.movable.dimen
 end
 
-function ButtonDialog:onFocusMove(args)
-    local ret = FocusManager.onFocusMove(self, args)
-
+function ButtonDialog:repaintAfterFocusMove(prev_item, next_item)
     -- If we're using a ScrollableContainer, ask it to scroll to the focused item
     if self.cropping_widget then
-        local focus = self:getFocusItem()
-        if self.dimen and focus and focus.dimen then
-            local button_y_offset = focus.dimen.y - self.dimen.y - self.top_to_content_offset
+        if self.dimen and next_item and next_item.dimen then
+            local button_y_offset = next_item.dimen.y - self.dimen.y - self.top_to_content_offset
             -- NOTE: The final argument ensures we'll always keep the neighboring item visible.
             --       (i.e., the top/bottom of the scrolled view is actually the previous/next item).
             self.cropping_widget:_scrollBy(0, button_y_offset, true)
         end
     end
 
-    return ret
+    -- We scroll first, so the base method paints the indicator where the button ended up.
+    FocusManager.repaintAfterFocusMove(self, prev_item, next_item)
 end
 
 function ButtonDialog:_onPageScrollToRow(row)
