@@ -127,10 +127,12 @@ function ListMenuItem:init()
     self.init_done = true
 end
 
---- Where the focus underline has to stop: paintTo puts the dogear over that corner
---- afterwards, and a focus-only repaint would slice it without redrawing it.
+--- Where the focus underline stops. Every row keeps that corner free, so the line
+--- holds one length across the list: on a row that paints a dogear the line would
+--- otherwise run under it, and a focus-only repaint would slice the corner without
+--- redrawing it.
 function ListMenuItem:getFocusLineRight(width)
-    -- The dogear is a sixth of the row, the size update() gives it. We work it out
+    -- The dogear takes a sixth of the row, the size update() gives it. We work that out
     -- from our own height because rows get built in any order, and a row built before
     -- the first loaded one would read the mark size while it is still unset.
     local mark_size = math.floor((self.height - 2 * self.underline_h) * (1/6))
@@ -203,7 +205,7 @@ function ListMenuItem:update()
         local wleft_width = dimen.w - wright:getWidth() - 3*pad_width - shortcut_width
         local line_left = pad_width + shortcut_width
         self._underline_container.line_x_offset = line_left
-        self._underline_container.line_width = dimen.w - line_left
+        self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
         local wleft = TextBoxWidget:new{
             text = BD.directory(self.text),
             face = Font:getFace("cfont", _fontSize(20, 24)),
