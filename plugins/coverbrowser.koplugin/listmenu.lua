@@ -705,14 +705,11 @@ function ListMenuItem:update()
                     face = Font:getFace("cfont", fontsize_info),
                 }
                 wright_width = wfileinfo:getSize().w
-                wright = CenterContainer:new{
-                    dimen = Geom:new{ w = wright_width, h = dimen.h },
-                    VerticalGroup:new{
-                        align = "right",
-                        VerticalSpan:new{ width = Screen:scaleBySize(2) },
-                        wfileinfo,
-                        wpageinfo,
-                    }
+                wright = VerticalGroup:new{
+                    align = "right",
+                    VerticalSpan:new{ width = Screen:scaleBySize(2) },
+                    wfileinfo,
+                    wpageinfo,
                 }
                 wright_right_padding = Screen:scaleBySize(10)
             end
@@ -741,12 +738,16 @@ function ListMenuItem:update()
             local line_left = Screen:scaleBySize(10) + shortcut_width
             self._underline_container.line_x_offset = line_left
             self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
-            widget = LeftContainer:new{
-                dimen = text_dimen:copy(),
+            local text_group = VerticalGroup:new{
+                VerticalSpan:new{ width = text_top_padding },
                 HorizontalGroup:new{
                     HorizontalSpan:new{ width = Screen:scaleBySize(10) + shortcut_width },
                     text_widget
                 },
+            }
+            widget = LeftContainer:new{
+                dimen = Geom:new{ w = text_dimen.w, h = text_group:getSize().h },
+                text_group,
             }
             -- The row keeps its full height whatever it holds: UnderlineContainer sizes
             -- itself from its child, and a shorter one would lift the line off the bottom.
