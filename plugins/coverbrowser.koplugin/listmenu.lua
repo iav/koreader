@@ -130,7 +130,11 @@ end
 --- Where the focus underline has to stop: paintTo puts the dogear over that corner
 --- afterwards, and a focus-only repaint would slice it without redrawing it.
 function ListMenuItem:getFocusLineRight(width)
-    return width - math.max(corner_mark_size, 0) - Screen:scaleBySize(6)
+    -- The dogear is a sixth of the row, the size update() gives it. We work it out
+    -- from our own height because rows get built in any order, and a row built before
+    -- the first loaded one would read the mark size while it is still unset.
+    local mark_size = math.floor((self.height - 2 * self.underline_h) * (1/6))
+    return width - mark_size - Screen:scaleBySize(6)
 end
 
 function ListMenuItem:update()
@@ -210,14 +214,20 @@ function ListMenuItem:update()
             height_adjust = true,
             height_overflow_show_ellipsis = true,
         }
+        -- Hang the name from the top of the row, the way a file row does: a container
+        -- the full height would centre it and hand the focus bar's room back to the text.
+        local wleft_group = VerticalGroup:new{
+            VerticalSpan:new{ width = text_top_padding },
+            HorizontalGroup:new{
+                HorizontalSpan:new{ width = pad_width + shortcut_width },
+                wleft,
+            },
+        }
         widget = OverlapGroup:new{
             dimen = dimen:copy(),
             LeftContainer:new{
-                dimen = dimen:copy(),
-                HorizontalGroup:new{
-                    HorizontalSpan:new{ width = pad_width + shortcut_width },
-                    wleft,
-                }
+                dimen = Geom:new{ w = dimen.w, h = wleft_group:getSize().h },
+                wleft_group,
             },
             RightContainer:new{
                 dimen = dimen:copy(),
@@ -731,18 +741,20 @@ function ListMenuItem:update()
                     text_widget
                 },
             }
+            -- The row keeps its full height whatever it holds: UnderlineContainer sizes
+            -- itself from its child, and a shorter one would lift the line off the bottom.
+            widget = OverlapGroup:new{
+                dimen = dimen:copy(),
+                widget,
+            }
             if wright then -- last read date, in History, even for deleted files
-                widget = OverlapGroup:new{
+                table.insert(widget, RightContainer:new{
                     dimen = dimen:copy(),
-                    widget,
-                    RightContainer:new{
-                        dimen = dimen:copy(),
-                        HorizontalGroup:new{
-                            wright,
-                            HorizontalSpan:new{ width = wright_right_padding },
-                        },
+                    HorizontalGroup:new{
+                        wright,
+                        HorizontalSpan:new{ width = wright_right_padding },
                     },
-                }
+                })
             end
         end
     end
