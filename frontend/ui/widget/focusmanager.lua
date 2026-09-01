@@ -307,7 +307,7 @@ function FocusManager:onFocusMove(args)
             local next_item = self.layout[self.selected.y][self.selected.x]
             current_item:handleEvent(Event:new("Unfocus"))
             next_item:handleEvent(Event:new("Focus"))
-            self:_repaintFocusChange(current_item, next_item)
+            self:repaintAfterFocusMove(current_item, next_item)
             break
         end
     end
@@ -315,6 +315,8 @@ function FocusManager:onFocusMove(args)
 end
 
 -- An item that knows where its focus indicator is, and can paint it on its own.
+-- We match by method name, not by class, so the two names are part of the contract:
+-- rename them and every implementor drops back to the slow path, silently.
 local function canFastRepaint(item)
     return item.getFocusIndicatorRegion and item.repaintFocusIndicator
 end
@@ -323,7 +325,13 @@ end
 --- When both items can paint their focus indicator on their own, we paint and refresh
 --- only those two indicators; otherwise we let the parent repaint it all.
 --- A fast repaint does not count toward a flashing eink refresh.
-function FocusManager:_repaintFocusChange(prev_item, next_item)
+---
+--- getFocusIndicatorRegion() returns the indicator's screen-absolute Geom, or nil to
+--- ask for the slow path. repaintFocusIndicator(bb) paints into Screen.bb unclipped,
+--- so an item inside a ScrollableContainer clips its own region first.
+--- A widget whose item positions have not settled by this point, or that wants a
+--- different repaint policy, overrides this.
+function FocusManager:repaintAfterFocusMove(prev_item, next_item)
     local parent = self.show_parent or self
     -- Painting outside UIManager's paint-pass skips Screen:beforePaint(), which is
     -- where forced HW rotation gets asserted; leave those screens the stock path.
@@ -398,6 +406,9 @@ FocusManager.NOT_FOCUS = 2
 FocusManager.FOCUS_ONLY_ON_NT = (Device:hasDPad() and not Device:isTouchDevice()) and 0 or FocusManager.NOT_FOCUS
 -- And in some cases, we may want to send both events *regardless* of heuristics or device caps
 FocusManager.FORCED_FOCUS = 4
+-- Lets a plugin tell whether this version repaints the indicator on its own; it cannot
+-- duck-check the two methods above, those live on the items it builds.
+FocusManager.HAS_FOCUS_INDICATOR_REPAINT = true
 
 --- Move focus to specified widget
 function FocusManager:moveFocusTo(x, y, focus_flags)
@@ -444,7 +455,7 @@ function FocusManager:moveFocusTo(x, y, focus_flags)
             if bit.band(focus_flags, FocusManager.NOT_FOCUS) ~= FocusManager.NOT_FOCUS then
                 target_item:handleEvent(Event:new("Focus"))
                 if unfocused_item then
-                    self:_repaintFocusChange(unfocused_item, target_item)
+                    self:repaintAfterFocusMove(unfocused_item, target_item)
                 else
                     -- We did not unfocus a single item, so there is nothing to narrow to.
                     UIManager:setDirty(self.show_parent or self, "fast")
