@@ -116,6 +116,7 @@ function ListMenuItem:init()
         },
         linesize = self.underline_h,
         focus_linesize = Size.line.focus_indicator,
+        background = Blitbuffer.COLOR_WHITE,
         -- widget : will be filled in self:update()
     }
     self[1] = self._underline_container
@@ -124,6 +125,16 @@ function ListMenuItem:init()
     -- have to do it more than once if item not found in db
     self:update()
     self.init_done = true
+end
+
+--- Where the focus underline stops. Every row keeps that corner free, so the line
+--- holds one length across the list: on a row that paints a dogear the line would
+--- otherwise run under it, and a focus-only repaint would slice the corner without
+--- redrawing it.
+function ListMenuItem:getFocusLineRight(width)
+    -- update() sizes the dogear for the current row height before it asks us where to
+    -- stop, so the cutoff and the mark paintTo() draws come from the same number.
+    return width - corner_mark_size - Screen:scaleBySize(6)
 end
 
 function ListMenuItem:update()
@@ -136,6 +147,35 @@ function ListMenuItem:update()
         w = self.width,
         h = self.height - 2 * self.underline_h
     }
+
+    -- Create or replace corner_mark if needed. Every row does this, whether or not it has
+    -- metadata to show, so that getFocusLineRight() below stops the underline at the size
+    -- paintTo() draws the mark.
+    local mark_size = math.floor(dimen.h * (1/6))
+    -- Just fits under the page info text, which in turn adapts to the ListMenuItem height.
+    if mark_size ~= corner_mark_size then
+        corner_mark_size = mark_size
+        if corner_mark then
+            corner_mark:free()
+        end
+        corner_mark = IconWidget:new{
+            icon = "dogear.opaque",
+            rotation_angle = BD.mirroredUILayout() and 180 or 270,
+            width = corner_mark_size,
+            height = corner_mark_size,
+        }
+    end
+    -- The text hangs from the top of the row, so what is left for it is the row minus
+    -- that padding, the room the focus bar needs at the bottom, and a gap above the bar
+    -- so descenders don't sit on it.
+    local text_top_padding = Size.padding.small
+    local text_dimen = dimen:copy()
+    text_dimen.h = dimen.h - text_top_padding
+                           - math.max(Size.line.focus_indicator - self.underline_h, 0)
+                           - Size.padding.small
+    -- We paint the shortcut square over the bottom left corner, and the focus bar must
+    -- not run under it: both need that corner kept free of anything else.
+    local shortcut_width = self.shortcut_icon and self.shortcut_icon.dimen.w or 0
 
     local function _fontSize(nominal, max)
         -- The nominal font size is based on 64px ListMenuItem height.
@@ -178,32 +218,46 @@ function ListMenuItem:update()
             face = Font:getFace("infont", _fontSize(14, 18)),
         }
         local pad_width = Screen:scaleBySize(10) -- on the left, in between, and on the right
-        local wleft_width = dimen.w - wright:getWidth() - 3*pad_width
+        local wleft_width = dimen.w - wright:getWidth() - 3*pad_width - shortcut_width
+        local line_left = pad_width + shortcut_width
+        self._underline_container.line_x_offset = line_left
+        self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
         local wleft = TextBoxWidget:new{
             text = BD.directory(self.text),
             face = Font:getFace("cfont", _fontSize(20, 24)),
             width = wleft_width,
             alignment = "left",
             bold = true,
-            height = dimen.h,
+            height = text_dimen.h,
             height_adjust = true,
             height_overflow_show_ellipsis = true,
+        }
+        -- Hang the name from the top of the row, the way a file row does: a container
+        -- the full height would centre it and hand the focus bar's room back to the text.
+        local wleft_group = VerticalGroup:new{
+            VerticalSpan:new{ width = text_top_padding },
+            HorizontalGroup:new{
+                HorizontalSpan:new{ width = pad_width + shortcut_width },
+                wleft,
+            },
+        }
+        -- The count shares the name's top padding, so the two keep one baseline.
+        local wright_group = VerticalGroup:new{
+            VerticalSpan:new{ width = text_top_padding },
+            HorizontalGroup:new{
+                wright,
+                HorizontalSpan:new{ width = pad_width },
+            },
         }
         widget = OverlapGroup:new{
             dimen = dimen:copy(),
             LeftContainer:new{
-                dimen = dimen:copy(),
-                HorizontalGroup:new{
-                    HorizontalSpan:new{ width = pad_width },
-                    wleft,
-                }
+                dimen = Geom:new{ w = dimen.w, h = wleft_group:getSize().h },
+                wleft_group,
             },
             RightContainer:new{
-                dimen = dimen:copy(),
-                HorizontalGroup:new{
-                    wright,
-                    HorizontalSpan:new{ width = pad_width },
-                },
+                dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
+                wright_group,
             },
         }
     else -- file
@@ -242,6 +296,9 @@ function ListMenuItem:update()
             -- Build the left widget : image if wanted
             local wleft = nil
             local wleft_width = 0 -- if not do_cover_image
+            if not self.do_cover_image then
+                wleft_width = shortcut_width
+            end
             local wleft_height
             if self.do_cover_image then
                 wleft_height = dimen.h
@@ -387,27 +444,9 @@ function ListMenuItem:update()
                 for i, w in ipairs(wright_items) do
                     wright_width = math.max(wright_width, w:getSize().w)
                 end
-                wright = CenterContainer:new{
-                    dimen = Geom:new{ w = wright_width, h = dimen.h },
-                    VerticalGroup:new(wright_items),
-                }
+                table.insert(wright_items, 1, VerticalSpan:new{ width = text_top_padding })
+                wright = VerticalGroup:new(wright_items)
                 wright_right_padding = Screen:scaleBySize(10)
-            end
-
-            -- Create or replace corner_mark if needed
-            local mark_size = math.floor(dimen.h * (1/6))
-            -- Just fits under the page info text, which in turn adapts to the ListMenuItem height.
-            if mark_size ~= corner_mark_size then
-                corner_mark_size = mark_size
-                if corner_mark then
-                    corner_mark:free()
-                end
-                corner_mark = IconWidget:new{
-                    icon = "dogear.opaque",
-                    rotation_angle = BD.mirroredUILayout() and 180 or 270,
-                    width = corner_mark_size,
-                    height = corner_mark_size,
-                }
             end
 
             -- Build the middle main widget, in the space available
@@ -419,6 +458,11 @@ function ListMenuItem:update()
             end
             local wmain_right_padding = Screen:scaleBySize(10) -- used only for next calculation
             local wmain_width = dimen.w - wleft_width - wmain_left_padding - wmain_right_padding - wright_width - wright_right_padding
+            -- Keep the focus underline clear of the cover: it may run under the right hand
+            -- column, just not over anything painted on top of the row.
+            local line_left = wleft_width + wmain_left_padding
+            self._underline_container.line_x_offset = line_left
+            self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
 
             local fontname_title = "cfont"
             local fontname_authors = "cfont"
@@ -536,7 +580,7 @@ function ListMenuItem:update()
                     build_authors()
                     height = height + wauthors:getSize().h
                 end
-                if height <= dimen.h then
+                if height <= text_dimen.h then
                     -- We fit!
                     break
                 end
@@ -550,7 +594,7 @@ function ListMenuItem:update()
                     local authors_min_height = 2 * authors_line_height -- unscaled_size_check: ignore
                     -- Chop lines, starting with authors, until
                     -- both labels fit in the allocated space.
-                    while title_height + authors_height > dimen.h do
+                    while title_height + authors_height > text_dimen.h do
                         if authors_height > authors_min_height then
                             authors_height = authors_height - authors_line_height
                         elseif title_height > title_min_height then
@@ -573,12 +617,16 @@ function ListMenuItem:update()
                 logger.dbg(title, "recalculate title/author with", fontsize_title)
             end
 
+            local wmain_group = VerticalGroup:new{
+                VerticalSpan:new{ width = text_top_padding },
+                wtitle,
+                wauthors,
+            }
+            -- Hang the text from the top of the row: the room the focus bar needs is at
+            -- the bottom, and centering would hand half of it back to the text.
             local wmain = LeftContainer:new{
-                dimen = dimen:copy(),
-                VerticalGroup:new{
-                    wtitle,
-                    wauthors,
-                }
+                dimen = Geom:new{ w = text_dimen.w, h = wmain_group:getSize().h },
+                wmain_group,
             }
 
             -- Build the final widget
@@ -602,23 +650,25 @@ function ListMenuItem:update()
             else
                 -- pad main widget on the left
                 wmain = HorizontalGroup:new{
+                        HorizontalSpan:new{ width = wleft_width },
                         HorizontalSpan:new{ width = wmain_left_padding },
                         wmain
                 }
             end
             -- add padded main widget
             table.insert(widget, LeftContainer:new{
-                    dimen = dimen:copy(),
+                    dimen = Geom:new{ w = text_dimen.w, h = wmain:getSize().h },
                     wmain
                 })
             -- add right widget
             if wright then
+                local wright_group = HorizontalGroup:new{
+                    wright,
+                    HorizontalSpan:new{ width = wright_right_padding },
+                }
                 table.insert(widget, RightContainer:new{
-                    dimen = dimen:copy(),
-                    HorizontalGroup:new{
-                        wright,
-                        HorizontalSpan:new{ width = wright_right_padding },
-                    },
+                    dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
+                    wright_group,
                 })
             end
 
@@ -655,14 +705,11 @@ function ListMenuItem:update()
                     face = Font:getFace("cfont", fontsize_info),
                 }
                 wright_width = wfileinfo:getSize().w
-                wright = CenterContainer:new{
-                    dimen = Geom:new{ w = wright_width, h = dimen.h },
-                    VerticalGroup:new{
-                        align = "right",
-                        VerticalSpan:new{ width = Screen:scaleBySize(2) },
-                        wfileinfo,
-                        wpageinfo,
-                    }
+                wright = VerticalGroup:new{
+                    align = "right",
+                    VerticalSpan:new{ width = Screen:scaleBySize(2) },
+                    wfileinfo,
+                    wpageinfo,
                 }
                 wright_right_padding = Screen:scaleBySize(10)
             end
@@ -681,32 +728,45 @@ function ListMenuItem:update()
                 text_widget = TextBoxWidget:new{
                     text = text .. hint,
                     face = Font:getFace("cfont", fontsize_no_bookinfo),
-                    width = dimen.w - 2 * Screen:scaleBySize(10) - wright_width - wright_right_padding,
+                    width = dimen.w - 2 * Screen:scaleBySize(10) - shortcut_width - wright_width - wright_right_padding,
                     alignment = "left",
                     fgcolor = fgcolor,
                 }
                 -- reduce font size for next loop, in case text widget is too large to fit into ListMenuItem
                 fontsize_no_bookinfo = fontsize_no_bookinfo - fontsize_dec_step
-            until text_widget:getSize().h <= dimen.h
-            widget = LeftContainer:new{
-                dimen = dimen:copy(),
+            until text_widget:getSize().h <= text_dimen.h
+            local line_left = Screen:scaleBySize(10) + shortcut_width
+            self._underline_container.line_x_offset = line_left
+            self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
+            local text_group = VerticalGroup:new{
+                VerticalSpan:new{ width = text_top_padding },
                 HorizontalGroup:new{
-                    HorizontalSpan:new{ width = Screen:scaleBySize(10) },
+                    HorizontalSpan:new{ width = Screen:scaleBySize(10) + shortcut_width },
                     text_widget
                 },
             }
+            widget = LeftContainer:new{
+                dimen = Geom:new{ w = text_dimen.w, h = text_group:getSize().h },
+                text_group,
+            }
+            -- The row keeps its full height whatever it holds: UnderlineContainer sizes
+            -- itself from its child, and a shorter one would lift the line off the bottom.
+            widget = OverlapGroup:new{
+                dimen = dimen:copy(),
+                widget,
+            }
             if wright then -- last read date, in History, even for deleted files
-                widget = OverlapGroup:new{
-                    dimen = dimen:copy(),
-                    widget,
-                    RightContainer:new{
-                        dimen = dimen:copy(),
-                        HorizontalGroup:new{
-                            wright,
-                            HorizontalSpan:new{ width = wright_right_padding },
-                        },
+                local wright_group = VerticalGroup:new{
+                    VerticalSpan:new{ width = text_top_padding },
+                    HorizontalGroup:new{
+                        wright,
+                        HorizontalSpan:new{ width = wright_right_padding },
                     },
                 }
+                table.insert(widget, RightContainer:new{
+                    dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
+                    wright_group,
+                })
             end
         end
     end
@@ -738,15 +798,14 @@ function ListMenuItem:paintTo(bb, x, y)
 
     -- to which we paint over the shortcut icon
     if self.shortcut_icon then
-        -- align it on bottom left corner of sub-widget
-        local target = self[1][1][2]
+        -- align it on the bottom left corner of the item
         local ix
         if BD.mirroredUILayout() then
-            ix = target.dimen.w - self.shortcut_icon.dimen.w - 2 * self.shortcut_icon.bordersize
+            ix = self.width - self.shortcut_icon.dimen.w - 2 * self.shortcut_icon.bordersize
         else
             ix = 0
         end
-        local iy = target.dimen.h - self.shortcut_icon.dimen.h - self.shortcut_icon.bordersize
+        local iy = self.height - self.shortcut_icon.dimen.h - 2 * self.shortcut_icon.bordersize
         self.shortcut_icon:paintTo(bb, x+ix, y+iy)
     end
 
@@ -792,6 +851,14 @@ function ListMenuItem:paintTo(bb, x, y)
 end
 
 -- As done in MenuItem
+function ListMenuItem:getFocusIndicatorRegion()
+    return self._underline_container and self._underline_container:getFocusIndicatorRegion()
+end
+
+function ListMenuItem:repaintFocusIndicator(bb)
+    return self._underline_container and self._underline_container:repaintFocusIndicator(bb)
+end
+
 function ListMenuItem:onFocus()
     self._underline_container.color = Blitbuffer.COLOR_BLACK
     self._underline_container.focused = true
