@@ -132,11 +132,9 @@ end
 --- otherwise run under it, and a focus-only repaint would slice the corner without
 --- redrawing it.
 function ListMenuItem:getFocusLineRight(width)
-    -- The dogear takes a sixth of the row, the size update() gives it. We work that out
-    -- from our own height because rows get built in any order, and a row built before
-    -- the first loaded one would read the mark size while it is still unset.
-    local mark_size = math.floor((self.height - 2 * self.underline_h) * (1/6))
-    return width - mark_size - Screen:scaleBySize(6)
+    -- update() sizes the dogear for the current row height before it asks us where to
+    -- stop, so the cutoff and the mark paintTo() draws come from the same number.
+    return width - corner_mark_size - Screen:scaleBySize(6)
 end
 
 function ListMenuItem:update()
@@ -149,6 +147,24 @@ function ListMenuItem:update()
         w = self.width,
         h = self.height - 2 * self.underline_h
     }
+
+    -- Create or replace corner_mark if needed. Every row does this, whether or not it has
+    -- metadata to show, so that getFocusLineRight() below stops the underline at the size
+    -- paintTo() draws the mark.
+    local mark_size = math.floor(dimen.h * (1/6))
+    -- Just fits under the page info text, which in turn adapts to the ListMenuItem height.
+    if mark_size ~= corner_mark_size then
+        corner_mark_size = mark_size
+        if corner_mark then
+            corner_mark:free()
+        end
+        corner_mark = IconWidget:new{
+            icon = "dogear.opaque",
+            rotation_angle = BD.mirroredUILayout() and 180 or 270,
+            width = corner_mark_size,
+            height = corner_mark_size,
+        }
+    end
     -- The text hangs from the top of the row, so what is left for it is the row minus
     -- that padding, the room the focus bar needs at the bottom, and a gap above the bar
     -- so descenders don't sit on it.
@@ -431,22 +447,6 @@ function ListMenuItem:update()
                 table.insert(wright_items, 1, VerticalSpan:new{ width = text_top_padding })
                 wright = VerticalGroup:new(wright_items)
                 wright_right_padding = Screen:scaleBySize(10)
-            end
-
-            -- Create or replace corner_mark if needed
-            local mark_size = math.floor(dimen.h * (1/6))
-            -- Just fits under the page info text, which in turn adapts to the ListMenuItem height.
-            if mark_size ~= corner_mark_size then
-                corner_mark_size = mark_size
-                if corner_mark then
-                    corner_mark:free()
-                end
-                corner_mark = IconWidget:new{
-                    icon = "dogear.opaque",
-                    rotation_angle = BD.mirroredUILayout() and 180 or 270,
-                    width = corner_mark_size,
-                    height = corner_mark_size,
-                }
             end
 
             -- Build the middle main widget, in the space available
