@@ -160,13 +160,11 @@ function ListMenuItem:update()
             height = corner_mark_size,
         }
     end
-    -- Height left for text: the focus bar can be thicker than the underline, and descenders
-    -- need a gap above it.
-    local text_top_padding = Size.padding.small
+    -- Centre the text in the room above the focus bar, which can be thicker than the underline;
+    -- the padding keeps descenders off the bar.
+    local text_area_h = dimen.h - math.max(Size.line.focus_row - self.underline_h, 0)
     local text_dimen = dimen:copy()
-    text_dimen.h = dimen.h - text_top_padding
-                           - math.max(Size.line.focus_row - self.underline_h, 0)
-                           - Size.padding.small
+    text_dimen.h = text_area_h - 2 * Size.padding.small
     -- The shortcut square is painted over the bottom left corner: keep text and the focus bar out of it.
     local shortcut_width = self.shortcut_icon and self.shortcut_icon.dimen.w or 0
 
@@ -225,29 +223,21 @@ function ListMenuItem:update()
             height_adjust = true,
             height_overflow_show_ellipsis = true,
         }
-        local wleft_group = VerticalGroup:new{
-            VerticalSpan:new{ width = text_top_padding },
-            HorizontalGroup:new{
-                HorizontalSpan:new{ width = pad_width + shortcut_width },
-                wleft,
-            },
-        }
-        local wright_group = VerticalGroup:new{
-            VerticalSpan:new{ width = text_top_padding },
-            HorizontalGroup:new{
-                wright,
-                HorizontalSpan:new{ width = pad_width },
-            },
-        }
         widget = OverlapGroup:new{
             dimen = dimen:copy(),
             LeftContainer:new{
-                dimen = Geom:new{ w = dimen.w, h = wleft_group:getSize().h },
-                wleft_group,
+                dimen = Geom:new{ w = dimen.w, h = text_area_h },
+                HorizontalGroup:new{
+                    HorizontalSpan:new{ width = pad_width + shortcut_width },
+                    wleft,
+                }
             },
             RightContainer:new{
-                dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
-                wright_group,
+                dimen = Geom:new{ w = dimen.w, h = text_area_h },
+                HorizontalGroup:new{
+                    wright,
+                    HorizontalSpan:new{ width = pad_width },
+                },
             },
         }
     else -- file
@@ -434,7 +424,6 @@ function ListMenuItem:update()
                 for i, w in ipairs(wright_items) do
                     wright_width = math.max(wright_width, w:getSize().w)
                 end
-                table.insert(wright_items, 1, VerticalSpan:new{ width = text_top_padding })
                 wright = VerticalGroup:new(wright_items)
                 wright_right_padding = Screen:scaleBySize(10)
             end
@@ -606,14 +595,12 @@ function ListMenuItem:update()
                 logger.dbg(title, "recalculate title/author with", fontsize_title)
             end
 
-            local wmain_group = VerticalGroup:new{
-                VerticalSpan:new{ width = text_top_padding },
-                wtitle,
-                wauthors,
-            }
             local wmain = LeftContainer:new{
-                dimen = Geom:new{ w = text_dimen.w, h = wmain_group:getSize().h },
-                wmain_group,
+                dimen = Geom:new{ w = text_dimen.w, h = text_area_h },
+                VerticalGroup:new{
+                    wtitle,
+                    wauthors,
+                }
             }
 
             -- Build the final widget
@@ -644,18 +631,17 @@ function ListMenuItem:update()
             end
             -- add padded main widget
             table.insert(widget, LeftContainer:new{
-                    dimen = Geom:new{ w = text_dimen.w, h = wmain:getSize().h },
+                    dimen = Geom:new{ w = text_dimen.w, h = text_area_h },
                     wmain
                 })
             -- add right widget
             if wright then
-                local wright_group = HorizontalGroup:new{
-                    wright,
-                    HorizontalSpan:new{ width = wright_right_padding },
-                }
                 table.insert(widget, RightContainer:new{
-                    dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
-                    wright_group,
+                    dimen = Geom:new{ w = dimen.w, h = text_area_h },
+                    HorizontalGroup:new{
+                        wright,
+                        HorizontalSpan:new{ width = wright_right_padding },
+                    },
                 })
             end
 
@@ -724,16 +710,12 @@ function ListMenuItem:update()
             local line_left = Screen:scaleBySize(10) + shortcut_width
             self._underline_container.line_x_offset = line_left
             self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
-            local text_group = VerticalGroup:new{
-                VerticalSpan:new{ width = text_top_padding },
+            widget = LeftContainer:new{
+                dimen = Geom:new{ w = text_dimen.w, h = text_area_h },
                 HorizontalGroup:new{
                     HorizontalSpan:new{ width = Screen:scaleBySize(10) + shortcut_width },
                     text_widget
                 },
-            }
-            widget = LeftContainer:new{
-                dimen = Geom:new{ w = text_dimen.w, h = text_group:getSize().h },
-                text_group,
             }
             -- UnderlineContainer takes its height from its child: keep the row full height so the
             -- line stays at the bottom.
@@ -742,16 +724,12 @@ function ListMenuItem:update()
                 widget,
             }
             if wright then -- last read date, in History, even for deleted files
-                local wright_group = VerticalGroup:new{
-                    VerticalSpan:new{ width = text_top_padding },
+                table.insert(widget, RightContainer:new{
+                    dimen = Geom:new{ w = dimen.w, h = text_area_h },
                     HorizontalGroup:new{
                         wright,
                         HorizontalSpan:new{ width = wright_right_padding },
                     },
-                }
-                table.insert(widget, RightContainer:new{
-                    dimen = Geom:new{ w = dimen.w, h = wright_group:getSize().h },
-                    wright_group,
                 })
             end
         end
