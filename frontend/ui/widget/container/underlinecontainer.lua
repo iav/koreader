@@ -76,15 +76,43 @@ function UnderlineContainer:_paintFocusBar(bb, line_x, bottom, line_width)
     bb:paintRect(line_x, self:_focusBarTop(bottom), line_width, h, color)
 end
 
+-- Keep a copy of the pixels the focus bar is about to cover, to put them back on unfocus.
+function UnderlineContainer:_saveUnderBar(bb, line_x, bottom, line_width)
+    local h = self:_focusBarHeight()
+    if h == 0 or self._under_bar then return end
+    self._under_bar = Blitbuffer.new(line_width, h, bb:getType())
+    self._under_bar:blitFrom(bb, 0, 0, line_x, self:_focusBarTop(bottom), line_width, h)
+end
+
+function UnderlineContainer:_restoreUnderBar(bb, line_x, bottom)
+    if not self._under_bar then return false end
+    bb:blitFrom(self._under_bar, line_x, self:_focusBarTop(bottom), 0, 0,
+        self._under_bar:getWidth(), self._under_bar:getHeight())
+    self:_dropUnderBar()
+    return true
+end
+
+function UnderlineContainer:_dropUnderBar()
+    if self._under_bar then
+        self._under_bar:free()
+        self._under_bar = nil
+    end
+end
+
 --- Repaint the line and the focus bar above it, leaving the child content alone.
 --- Returns false when we cannot do that by ourselves.
 function UnderlineContainer:repaintFocusIndicator(bb)
     if not self._painted then return false end
-    -- Without a background we don't know what colour to paint the now-unfocused bar.
-    if self:_focusBarHeight() > 0 and not self.background then return false end
     local line_x, line_width = self:_getLineXAndWidth()
     local bottom = self.dimen.y + self:getSize().h
-    self:_paintFocusBar(bb, line_x, bottom, line_width)
+    if self.focused then
+        self:_saveUnderBar(bb, line_x, bottom, line_width)
+        self:_paintFocusBar(bb, line_x, bottom, line_width)
+    elseif not self:_restoreUnderBar(bb, line_x, bottom) then
+        -- Nothing saved and no background: we can't undraw the bar.
+        if self:_focusBarHeight() > 0 and not self.background then return false end
+        self:_paintFocusBar(bb, line_x, bottom, line_width)
+    end
     bb:paintRect(line_x, bottom - self.linesize, line_width, self.linesize, self.color)
     return true
 end
@@ -102,6 +130,8 @@ function UnderlineContainer:paintTo(bb, x, y)
         self.dimen.y = y
     end
     self._painted = true
+    -- A full repaint replaces whatever we saved under the bar.
+    self:_dropUnderBar()
 
     local line_x, line_width = self:_getLineXAndWidth()
     local bottom = y + container_size.h

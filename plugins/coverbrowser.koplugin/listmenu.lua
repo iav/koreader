@@ -733,6 +733,8 @@ function ListMenuItem:paintTo(bb, x, y)
         logger.err("ListMenuItem:paintTo() got non-integer x/y :", x, y)
     end
 
+    -- Where we were painted, for a repaint of the row on our own.
+    self._paint_x, self._paint_y = x, y
     -- Original painting
     InputContainer.paintTo(self, bb, x, y)
 
@@ -789,6 +791,21 @@ function ListMenuItem:paintTo(bb, x, y)
             bb:paintBorder(ix, y, d_w, d_h, 1)
         end
     end
+end
+
+function ListMenuItem:getFocusIndicatorRegion()
+    return self._underline_container:getFocusIndicatorRegion()
+end
+
+function ListMenuItem:repaintFocusIndicator(bb)
+    if self._underline_container:repaintFocusIndicator(bb) then return true end
+    -- The row was painted whole while focused, so nothing is saved under the bar:
+    -- clear the bar and repaint the row over it.
+    if not self._paint_x then return false end
+    local region = self:getFocusIndicatorRegion()
+    bb:paintRect(region.x, region.y, region.w, region.h, Blitbuffer.COLOR_WHITE)
+    self:paintTo(bb, self._paint_x, self._paint_y)
+    return true
 end
 
 -- As done in MenuItem
