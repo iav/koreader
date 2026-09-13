@@ -127,12 +127,6 @@ function ListMenuItem:init()
     self.init_done = true
 end
 
---- Right end of the focus underline: clear of the dogear on every row, so the line ends
---- at the same x down the list and a focus-only repaint never slices the mark.
-function ListMenuItem:getFocusLineRight(width)
-    return width - corner_mark_size - Screen:scaleBySize(6)
-end
-
 function ListMenuItem:update()
     -- We will be a distinctive widget whether we are a directory,
     -- a known file with image / without image, or a not yet known file
@@ -144,8 +138,7 @@ function ListMenuItem:update()
         h = self.height - 2 * self.underline_h
     }
 
-    -- Create or replace corner_mark if needed. Every row does this, so getFocusLineRight()
-    -- sees the size paintTo() draws.
+    -- Create or replace corner_mark if needed
     local mark_size = math.floor(dimen.h * (1/6))
     -- Just fits under the page info text, which in turn adapts to the ListMenuItem height.
     if mark_size ~= corner_mark_size then
@@ -205,9 +198,6 @@ function ListMenuItem:update()
         }
         local pad_width = Screen:scaleBySize(10) -- on the left, in between, and on the right
         local wleft_width = dimen.w - wright:getWidth() - 3*pad_width
-        local line_left = pad_width + shortcut_width
-        self._underline_container.line_x_offset = line_left
-        self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
         local wleft = TextBoxWidget:new{
             text = BD.directory(self.text),
             face = Font:getFace("cfont", _fontSize(20, 24)),
@@ -235,6 +225,10 @@ function ListMenuItem:update()
                 },
             },
         }
+
+        local line_left = pad_width + shortcut_width
+        self._underline_container.line_x_offset = line_left
+        self._underline_container.line_width = math.max(dimen.w - corner_mark_size - Screen:scaleBySize(6) - line_left, 0)
     else -- file
         self.file_deleted = self.entry.dim -- entry with deleted file from History or selected file from FM
         local fgcolor = self.file_deleted and Blitbuffer.COLOR_DARK_GRAY or nil
@@ -432,10 +426,6 @@ function ListMenuItem:update()
             end
             local wmain_right_padding = Screen:scaleBySize(10) -- used only for next calculation
             local wmain_width = dimen.w - wleft_width - wmain_left_padding - wmain_right_padding - wright_width - wright_right_padding
-            -- Start the underline past the cover or the shortcut square, so a focus-only repaint doesn't slice them.
-            local line_left = (self.do_cover_image and wleft_width or shortcut_width) + wmain_left_padding
-            self._underline_container.line_x_offset = line_left
-            self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
 
             local fontname_title = "cfont"
             local fontname_authors = "cfont"
@@ -639,6 +629,11 @@ function ListMenuItem:update()
                 })
             end
 
+            -- Start the underline past the cover or the shortcut square, so a focus-only repaint doesn't slice them.
+            local line_left = (self.do_cover_image and wleft_width or shortcut_width) + wmain_left_padding
+            self._underline_container.line_x_offset = line_left
+            self._underline_container.line_width = math.max(dimen.w - corner_mark_size - Screen:scaleBySize(6) - line_left, 0)
+
         else -- bookinfo not found
             if self.init_done then
                 -- Non-initial update(), but our widget is still not found:
@@ -705,9 +700,6 @@ function ListMenuItem:update()
                 -- reduce font size for next loop, in case text widget is too large to fit into ListMenuItem
                 fontsize_no_bookinfo = fontsize_no_bookinfo - fontsize_dec_step
             until text_widget:getSize().h <= dimen.h
-            local line_left = Screen:scaleBySize(10) + shortcut_width
-            self._underline_container.line_x_offset = line_left
-            self._underline_container.line_width = math.max(self:getFocusLineRight(dimen.w) - line_left, 0)
             widget = LeftContainer:new{
                 dimen = dimen:copy(),
                 HorizontalGroup:new{
@@ -728,6 +720,10 @@ function ListMenuItem:update()
                     },
                 }
             end
+
+            local line_left = Screen:scaleBySize(10) + shortcut_width
+            self._underline_container.line_x_offset = line_left
+            self._underline_container.line_width = math.max(dimen.w - corner_mark_size - Screen:scaleBySize(6) - line_left, 0)
         end
     end
 
